@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>NoisyBoy Soundboard</title>
+    <style>
+        body {
+            background-color: #313338; /* Color de fondo de Discord */
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .btn-sonido {
+            background-color: #5865F2; /* Azul Discord */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 20px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-sonido:hover {
+            background-color: #4752C4;
+        }
+        .btn-sonido:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Panel de Sonidos</h1>
+    <p>Haz clic para enviar la orden al motor C++</p>
+
+    <div class="grid">
+        <button class="btn-sonido" onclick="reproducirSonido()">🔊 Sonido 1</button>
+        </div>
+
+    <script>
+        // Esta función envía un mensaje invisible a tu programa C++
+        function reproducirSonido() {
+            // Llama al puerto 8080 de tu propia PC
+            fetch('http://localhost:8080/play')
+                .then(response => console.log("¡Orden enviada con éxito!"))
+                .catch(error => console.error("Error: ¿Está la consola negra abierta?", error));
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="NoisyBoy/NoisyBoy.vcxproj" Id="a7225096-1fe9-4dcc-8744-4156c6435033" />
+</Solution>

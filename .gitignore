@@ -1,0 +1,25 @@
+# Carpetas ocultas de los editores
+.vs/
+.vscode/
+
+# Archivos de caché y bases de datos de Visual Studio
+*.suo
+*.user
+*.db
+*.ipch
+
+# Carpetas y archivos generados al compilar (Build)
+x64/
+Debug/
+Release/
+*.exe
+*.obj
+*.ilk
+*.pdb
+*.log
+*.recipe
+*.tlog
+
+# Ignorar archivos de audio pesados
+*.mp3
+*.wav
