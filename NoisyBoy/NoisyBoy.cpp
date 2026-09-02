@@ -1,7 +1,10 @@
+#define WIN32_LEAN_AND_MEAN
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 #include "httplib.h" // NUESTRO NUEVO SERVIDOR
 #include <iostream>
+#include <filesystem>
+namespace fs = std::filesystem;
 #pragma comment(lib, "ws2_32.lib")
 
 struct DatosApp {
@@ -22,8 +25,9 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     }
 
     if (pDatos->reproduciendo) {
-        float bufferArchivo[8192]; 
-        ma_uint32 framesLeidos = (ma_uint32)ma_decoder_read_pcm_frames(&pDatos->decodificador, bufferArchivo, frameCount);
+        float bufferArchivo[8192];
+        ma_uint64 framesLeidos = 0; 
+        ma_decoder_read_pcm_frames(&pDatos->decodificador, bufferArchivo, frameCount, &framesLeidos);
         
         for (ma_uint32 i = 0; i < framesLeidos * pDevice->playback.channels; ++i) {
             salida[i] += bufferArchivo[i]; 
@@ -50,10 +54,10 @@ int main() {
     ma_decoder_init_file("sonido.mp3", &decoderConfig, &datos.decodificador);
 
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_duplex);
-    deviceConfig.capture.pDeviceID  = &pCaptureInfos[0].id;
+    deviceConfig.capture.pDeviceID  = NULL;
     deviceConfig.capture.format     = ma_format_f32;
     deviceConfig.capture.channels   = 2;
-    deviceConfig.playback.pDeviceID = &pPlaybackInfos[3].id;
+    deviceConfig.playback.pDeviceID = NULL;
     deviceConfig.playback.format    = ma_format_f32;
     deviceConfig.playback.channels  = 2;
     deviceConfig.sampleRate         = 48000;
@@ -71,12 +75,36 @@ int main() {
 
     // Cuando la web pida la ruta "/play", ejecutamos esto:
     svr.Get("/play", [&](const httplib::Request& req, httplib::Response& res) {
-        datos.reproduciendo = true; // ¡Disparamos el audio!
         
+        // 1. Verificamos si la web nos mandó el nombre de un archivo (ej. ?file=victoria.mp3)
+        if (req.has_param("file")) {
+            // Armamos la ruta completa: "sonidos/victoria.mp3"
+            std::string archivoNuevo = "sonidos/" + req.get_param_value("file");
+            
+            // 2. Detenemos la reproducción actual
+            datos.reproduciendo = false;
+            
+            // 3. "Desenchufamos" el archivo viejo de miniaudio
+            ma_decoder_uninit(&datos.decodificador);
+            
+            // 4. "Enchufamos" el archivo nuevo
+            if (ma_decoder_init_file(archivoNuevo.c_str(), NULL, &datos.decodificador) != MA_SUCCESS) {
+                std::cout << "Error al cargar el archivo: " << archivoNuevo << std::endl;
+                res.set_content("Error al cargar audio", "text/plain");
+                return; // Salimos si hubo error
+            }
+            
+            // 5. ¡Le decimos a miniaudio que dispare el nuevo sonido!
+            datos.reproduciendo = true;
+            
+            std::cout << "> Orden recibida. Reproduciendo: " << req.get_param_value("file") << std::endl;
+        } else {
+             std::cout << "> Orden vacia recibida." << std::endl;
+        }
+
         // Esto evita errores de seguridad en el navegador (CORS)
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content("Audio disparado", "text/plain");
-        std::cout << "> Orden recibida desde la web. Reproduciendo..." << std::endl;
     });
 
     std::cout << "--- NOISYBOY MOTOR Y SERVIDOR ACTIVOS ---" << std::endl;
@@ -85,6 +113,19 @@ int main() {
     std::cout << "Haz doble clic en tu archivo 'index.html' para usar la botonera." << std::endl;
     std::cout << "-----------------------------------------" << std::endl;
 
+    svr.Get("/api/sonidos", [](const httplib::Request& req, httplib::Response& res) {
+    std::string json = "[";
+    bool primero = true;
+    for (const auto& entry : fs::directory_iterator("sonidos")) {
+        if (entry.path().extension() == ".mp3" || entry.path().extension() == ".wav") {
+            if (!primero) json += ",";
+            json += "\"" + entry.path().filename().string() + "\"";
+            primero = false;
+        }
+    }
+    json += "]";
+    res.set_content(json, "application/json");
+});
     // Esto reemplaza al "while(true)" del teclado. El servidor se queda escuchando para siempre.
     svr.listen("localhost", 8080);
 
