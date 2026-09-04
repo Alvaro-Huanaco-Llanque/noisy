@@ -4,57 +4,253 @@
     <meta charset="UTF-8">
     <title>NoisyBoy Soundboard</title>
     <style>
+        /* COLORES Y FUENTES ESTILO DISCORD */
+        :root {
+            --bg-principal: #313338;
+            --bg-sidebar: #1e1f22;
+            --bg-boton: #2b2d31;
+            --bg-boton-hover: #404249;
+            --texto-principal: #dbdee1;
+            --texto-secundario: #949ba4;
+        }
+
         body {
-            background-color: #313338; /* Color de fondo de Discord */
-            color: white;
+            margin: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0e1629; /* Fondo azul oscuro del exterior */
+            color: var(--texto-principal);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* BARRA LATERAL (IZQUIERDA) */
+        .sidebar {
+            width: 72px;
+            background-color: var(--bg-sidebar);
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 50px;
+            padding-top: 12px;
+            gap: 10px;
         }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-top: 20px;
+
+        /* CIRCULO DEL LOGO */
+        .logo-circle {
+            width: 48px;
+            height: 48px;
+            background-color: #e3e5e8;
+            border-radius: 50%;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-radius 0.2s;
         }
-        .btn-sonido {
+        .logo-circle:hover { border-radius: 15px; }
+
+        /* ICONOS DE LA BARRA LATERAL */
+        .icono-sidebar {
+            width: 48px;
+            height: 48px;
+            background-color: var(--bg-boton);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .icono-sidebar:hover {
+            border-radius: 15px;
             background-color: #5865F2; /* Azul Discord */
             color: white;
+        }
+
+        /* CONTENEDOR PRINCIPAL DERECHO */
+        .main-content {
+            flex: 1;
+            background-color: var(--bg-principal);
+            display: flex;
+            flex-direction: column;
+            border-top-left-radius: 10px;
+        }
+
+        /* BARRA SUPERIOR (Buscador y controles) */
+        .topbar {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid #1f2023;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        .buscador {
+            background-color: #1e1f22;
             border: none;
-            border-radius: 8px;
-            padding: 20px 30px;
-            font-size: 16px;
+            color: var(--texto-principal);
+            padding: 8px 15px;
+            border-radius: 4px;
+            width: 300px;
+            outline: none;
+        }
+
+        /* AREA DE LAS SECCIONES DE SONIDO */
+        .panel-sonidos {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* SECCIONES Y SOLAPAS */
+        .seccion { margin-bottom: 25px; }
+        
+        .seccion-header {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
             font-weight: bold;
+            color: var(--texto-secundario);
             cursor: pointer;
-            transition: background-color 0.2s;
+            margin-bottom: 15px;
+            user-select: none;
         }
-        .btn-sonido:hover {
-            background-color: #4752C4;
+        .seccion-header:hover { color: var(--texto-principal); }
+        .flecha { margin-left: 5px; transition: transform 0.2s; }
+        
+        /* CLASE PARA OCULTAR (Solapa cerrada) */
+        .oculto { display: none !important; }
+        .flecha-cerrada { transform: rotate(-90deg); }
+
+        /* GRILLA DE BOTONES */
+        .grilla-botones {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
         }
-        .btn-sonido:active {
-            transform: scale(0.95);
+
+        /* DISEÑO DE LOS BOTONES DE SONIDO */
+        .boton-sonido {
+            background-color: var(--bg-boton);
+            color: var(--texto-principal);
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.1s;
+            text-align: left;
         }
+        .boton-sonido:hover { background-color: var(--bg-boton-hover); }
+        .boton-sonido:active { transform: translateY(1px); }
+
     </style>
 </head>
 <body>
 
-    <h1>Panel de Sonidos</h1>
-    <p>Haz clic para enviar la orden al motor C++</p>
+    <!-- BARRA LATERAL -->
+    <div class="sidebar">
+        <!-- Logo -->
+        <div class="logo-circle" title="Logo NoisyBoy"></div>
+        
+        <!-- Iconos de navegación que scrollean a las secciones -->
+        <div class="icono-sidebar" onclick="irA('seccion-fav')" title="Favoritos">⭐</div>
+        <div class="icono-sidebar" onclick="irA('seccion-freq')" title="Frecuentes">🕒</div>
+        <div class="icono-sidebar" onclick="irA('seccion-noisy')" title="NOISY">🔊</div>
+    </div>
 
-    <div class="grid">
-        <button class="btn-sonido" onclick="reproducirSonido()">🔊 Sonido 1</button>
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-content">
+        
+        <!-- HEADER (Buscador) -->
+        <div class="topbar">
+            <input type="text" class="buscador" placeholder="🔍 Encuentra el sonido perfecto">
         </div>
 
+        <!-- PANEL DE SONIDOS -->
+        <div class="panel-sonidos">
+            
+            <!-- SECCIÓN 1: FAVORITOS (Inicia cerrada como en tu foto) -->
+            <div class="seccion" id="seccion-fav">
+                <div class="seccion-header" onclick="toggleSeccion('fav-contenido', 'fav-flecha')">
+                    ⭐ Favoritos <span class="flecha flecha-cerrada" id="fav-flecha">˅</span>
+                </div>
+                <div class="grilla-botones oculto" id="fav-contenido">
+                    <!-- Botones de ejemplo -->
+                    <button class="boton-sonido">🦆 quack</button>
+                    <button class="boton-sonido">🏏 cricket</button>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: FRECUENTES -->
+            <div class="seccion" id="seccion-freq">
+                <div class="seccion-header" onclick="toggleSeccion('freq-contenido', 'freq-flecha')">
+                    🕒 Usados frecuentemente <span class="flecha" id="freq-flecha">˅</span>
+                </div>
+                <div class="grilla-botones" id="freq-contenido">
+                    <button class="boton-sonido">🥁 ba dum tss</button>
+                    <button class="boton-sonido">🎺 sad horn</button>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 3: NOISY (Aquí inyectamos tus audios reales del C++) -->
+            <div class="seccion" id="seccion-noisy">
+                <div class="seccion-header" onclick="toggleSeccion('noisy-contenido', 'noisy-flecha')">
+                    🔊 NOISY <span class="flecha" id="noisy-flecha">˅</span>
+                </div>
+                <!-- El contenedor vacío donde JS pondrá los botones dinámicos -->
+                <div class="grilla-botones" id="noisy-contenido"></div>
+            </div>
+
+        </div>
+    </div>
+
     <script>
-        // Esta función envía un mensaje invisible a tu programa C++
-        function reproducirSonido() {
-            // Llama al puerto 8080 de tu propia PC
-            fetch('http://localhost:8080/play')
-                .then(response => console.log("¡Orden enviada con éxito!"))
-                .catch(error => console.error("Error: ¿Está la consola negra abierta?", error));
+        // --- 1. FUNCIÓN PARA ABRIR Y CERRAR SOLAPAS ---
+        function toggleSeccion(idContenido, idFlecha) {
+            const contenido = document.getElementById(idContenido);
+            const flecha = document.getElementById(idFlecha);
+            
+            // Alterna la clase 'oculto'
+            contenido.classList.toggle('oculto');
+            // Gira la flechita
+            flecha.classList.toggle('flecha-cerrada');
         }
+
+        // --- 2. FUNCIÓN PARA NAVEGAR DESDE LA BARRA LATERAL ---
+        function irA(idSeccion) {
+            document.getElementById(idSeccion).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- 3. CONEXIÓN AL MOTOR C++ (Tu código anterior) ---
+        fetch('http://localhost:8080/api/sonidos')
+            .then(respuesta => respuesta.json())
+            .then(listaSonidos => {
+                // Ahora metemos los botones dinámicos en la sección NOISY
+                const contenedor = document.getElementById('noisy-contenido');
+                
+                listaSonidos.forEach(archivo => {
+                    const btn = document.createElement('button');
+                    btn.className = "boton-sonido";
+                    
+                    // Limpiamos la extensión (.mp3 o .wav) para que el botón se vea más lindo
+                    const nombreLimpio = archivo.replace(".mp3", "").replace(".wav", "");
+                    btn.innerHTML = `🔊 ${nombreLimpio}`; 
+                    
+                    btn.onclick = () => {
+                        fetch('http://localhost:8080/play?file=' + archivo);
+                    };
+                    
+                    contenedor.appendChild(btn);
+                });
+            })
+            .catch(error => {
+                console.error("Error C++:", error);
+                document.getElementById('noisy-contenido').innerHTML = "<p style='color:red;'>Servidor C++ apagado.</p>";
+            });
     </script>
 
 </body>

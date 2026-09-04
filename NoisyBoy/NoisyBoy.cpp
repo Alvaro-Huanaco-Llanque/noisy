@@ -4,11 +4,14 @@
 #include "httplib.h" // NUESTRO NUEVO SERVIDOR
 #include <iostream>
 #include <filesystem>
+#include <thread>     // NUEVO: Para dividir el programa en dos
+#include <windows.h>
 namespace fs = std::filesystem;
 #pragma comment(lib, "ws2_32.lib")
 
 struct DatosApp {
-    ma_decoder decodificador;
+    ma_decoder decodificador;        // Para el Cable Virtual (Discord)
+    ma_decoder decodificadorMonitor; // Para tus Auriculares
     bool reproduciendo = false;
 };
 
@@ -40,6 +43,21 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     }
 }
 
+void data_callback_monitoreo(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+    DatosApp* pDatos = (DatosApp*)pDevice->pUserData;
+    float* salida = (float*)pOutput;
+
+    if (pDatos->reproduciendo) {
+        float bufferArchivo[8192];
+        ma_uint64 framesLeidos = 0;
+        ma_decoder_read_pcm_frames(&pDatos->decodificadorMonitor, bufferArchivo, frameCount, &framesLeidos);
+        
+        for (ma_uint32 i = 0; i < framesLeidos * pDevice->playback.channels; ++i) {
+            salida[i] = bufferArchivo[i]; // Audio puro, sin tu voz
+        }
+    }
+}
+
 int main() {
     // 1. Inicializamos miniaudio (Mismo código de antes)
     ma_context context;
@@ -52,21 +70,64 @@ int main() {
     DatosApp datos;
     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 48000);
     ma_decoder_init_file("sonido.mp3", &decoderConfig, &datos.decodificador);
+    ma_decoder_init_file("sonido.mp3", &decoderConfig, &datos.decodificadorMonitor); // <-- Agrega esta línea
 
+    // --- 1. EL RADAR: Buscamos el Cable Virtual entre todos tus altavoces ---
+    ma_device_id cablePlaybackID;
+    bool cableEncontrado = false;
+
+    for (ma_uint32 i = 0; i < playbackCount; ++i) {
+        std::string nombreDispositivo = pPlaybackInfos[i].name;
+        
+        // Si el nombre contiene la palabra "CABLE Input", lo atrapamos
+        if (nombreDispositivo.find("CABLE Input") != std::string::npos) {
+            cablePlaybackID = pPlaybackInfos[i].id;
+            cableEncontrado = true;
+            std::cout << ">>> EXITO: VB-Cable detectado y conectado automaticamente (" << nombreDispositivo << ")" << std::endl;
+            break; // Dejamos de buscar
+        }
+    }
+
+    // --- 2. CONFIGURACIÓN DEL MOTOR ---
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_duplex);
-    deviceConfig.capture.pDeviceID  = NULL;
+    
+    // El micrófono siempre usa el que tengas por defecto en Windows
+    deviceConfig.capture.pDeviceID  = NULL; 
     deviceConfig.capture.format     = ma_format_f32;
     deviceConfig.capture.channels   = 2;
-    deviceConfig.playback.pDeviceID = NULL;
+    
+    // ¡La magia del Enrutamiento Inteligente!
+    if (cableEncontrado) {
+        // Si encontró el cable, manda el audio para Discord
+        deviceConfig.playback.pDeviceID = &cablePlaybackID; 
+    } else {
+        // Si por alguna razón no lo encuentra, usa tus altavoces normales
+        deviceConfig.playback.pDeviceID = NULL; 
+        std::cout << ">>> ADVERTENCIA: No se encontro VB-Cable. Usando altavoces por defecto." << std::endl;
+    }
+    
     deviceConfig.playback.format    = ma_format_f32;
     deviceConfig.playback.channels  = 2;
     deviceConfig.sampleRate         = 48000;
     deviceConfig.dataCallback       = data_callback;
-    deviceConfig.pUserData          = &datos; 
+    deviceConfig.pUserData          = &datos;
 
     ma_device device;
     ma_device_init(&context, &deviceConfig, &device);
     ma_device_start(&device);
+
+    // --- 3. EL SEGUNDO MOTOR (Tus Oídos) ---
+    ma_device_config configMonitor = ma_device_config_init(ma_device_type_playback);
+    configMonitor.playback.pDeviceID = NULL; // Esto fuerza a usar tus auriculares de siempre
+    configMonitor.playback.format    = ma_format_f32;
+    configMonitor.playback.channels  = 2;
+    configMonitor.sampleRate         = 48000;
+    configMonitor.dataCallback       = data_callback_monitoreo;
+    configMonitor.pUserData          = &datos;
+
+    ma_device deviceMonitor;
+    ma_device_init(&context, &configMonitor, &deviceMonitor);
+    ma_device_start(&deviceMonitor);
     
     // ==========================================
     // 2. EL NUEVO SERVIDOR WEB PARA EL FRONTEND
@@ -84,17 +145,18 @@ int main() {
             // 2. Detenemos la reproducción actual
             datos.reproduciendo = false;
             
-            // 3. "Desenchufamos" el archivo viejo de miniaudio
-            ma_decoder_uninit(&datos.decodificador);
-            
-            // 4. "Enchufamos" el archivo nuevo
-            if (ma_decoder_init_file(archivoNuevo.c_str(), NULL, &datos.decodificador) != MA_SUCCESS) {
-                std::cout << "Error al cargar el archivo: " << archivoNuevo << std::endl;
-                res.set_content("Error al cargar audio", "text/plain");
-                return; // Salimos si hubo error
-            }
-            
-            // 5. ¡Le decimos a miniaudio que dispare el nuevo sonido!
+           // 3. "Desenchufamos" el archivo viejo de ambos decodificadores
+        ma_decoder_uninit(&datos.decodificador);
+        ma_decoder_uninit(&datos.decodificadorMonitor);
+        
+        // 4. "Enchufamos" el archivo nuevo en ambos a la vez
+        if (ma_decoder_init_file(archivoNuevo.c_str(), NULL, &datos.decodificador) != MA_SUCCESS) {
+            std::cout << "Error al cargar el archivo: " << archivoNuevo << std::endl;
+            res.set_content("Error al cargar audio", "text/plain");
+            return; // Salimos si hubo error
+        }
+        // Inicializamos el monitor (tus auriculares) sin necesidad de chequear error de nuevo
+        ma_decoder_init_file(archivoNuevo.c_str(), NULL, &datos.decodificadorMonitor);
             datos.reproduciendo = true;
             
             std::cout << "> Orden recibida. Reproduciendo: " << req.get_param_value("file") << std::endl;
@@ -114,20 +176,40 @@ int main() {
     std::cout << "-----------------------------------------" << std::endl;
 
     svr.Get("/api/sonidos", [](const httplib::Request& req, httplib::Response& res) {
-    std::string json = "[";
-    bool primero = true;
-    for (const auto& entry : fs::directory_iterator("sonidos")) {
-        if (entry.path().extension() == ".mp3" || entry.path().extension() == ".wav") {
-            if (!primero) json += ",";
-            json += "\"" + entry.path().filename().string() + "\"";
-            primero = false;
+        std::string json = "[";
+        bool primero = true;
+        for (const auto& entry : fs::directory_iterator("sonidos")) {
+            if (entry.path().extension() == ".mp3" || entry.path().extension() == ".wav") {
+                if (!primero) json += ",";
+                json += "\"" + entry.path().filename().string() + "\"";
+                primero = false;
+            }
         }
-    }
-    json += "]";
-    res.set_content(json, "application/json");
-});
+        json += "]";
+        
+        // ¡Esta es la línea mágica que le da permiso al navegador!
+        res.set_header("Access-Control-Allow-Origin", "*"); 
+        
+        res.set_content(json, "application/json");
+    });
     // Esto reemplaza al "while(true)" del teclado. El servidor se queda escuchando para siempre.
-    svr.listen("localhost", 8080);
+    // 1. Hacemos que C++ ahora también sirva la interfaz visual, no solo los audios
+    svr.set_mount_point("/", "./");
+
+    // 2. Encendemos el servidor en un "Hilo" secundario (Background)
+    std::thread hiloServidor([&svr]() {
+        svr.listen("localhost", 8080);
+    });
+
+    // 3. Esperamos 1 segundo para asegurarnos de que el servidor esté 100% listo
+    Sleep(1000);
+
+    // 4. ¡Magia! Invocamos la ventana nativa. 
+    // Usamos el motor de Edge porque está preinstalado en todo Windows 10/11.
+    system("start msedge --app=\"http://localhost:8080/index.html\"");
+
+    // 5. Le decimos al programa principal que se quede esperando a que el hilo termine
+    hiloServidor.join();
 
     // Limpieza
     ma_device_uninit(&device);
