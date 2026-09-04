@@ -47,6 +47,12 @@ void data_callback_monitoreo(ma_device* pDevice, void* pOutput, const void* pInp
     DatosApp* pDatos = (DatosApp*)pDevice->pUserData;
     float* salida = (float*)pOutput;
 
+    // 1. Limpiamos la salida (silencio total por defecto para que la tarjeta de sonido no se bloquee)
+    for (ma_uint32 i = 0; i < frameCount * pDevice->playback.channels; ++i) {
+        salida[i] = 0.0f;
+    }
+
+    // 2. Si hay que reproducir, sobreescribimos el silencio con la música
     if (pDatos->reproduciendo) {
         float bufferArchivo[8192];
         ma_uint64 framesLeidos = 0;
